@@ -7,6 +7,6 @@
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
   "redirect_uris": ["https://moshyfawn.tngl.io/obsidian-pds-sync/callback.html"],
-  "scope": "atproto repo:site.standard.document repo:app.pdssync.note blob:*/*",
+  "scope": "atproto repo:site.standard.document repo:site.standard.publication repo:app.pdssync.note blob:*/*",
   "token_endpoint_auth_method": "none"
 }
