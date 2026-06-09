@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>PDS Sync - returning to Obsidian</title>
+	</head>
+	<body
+		style="
+			font-family: system-ui, sans-serif;
+			text-align: center;
+			padding: 3rem;
+		"
+	>
+		<p>Returning to Obsidian…</p>
+		<p><a id="link" href="#">Continue</a></p>
+		<script>
+			const params =
+				window.location.search.slice(1) ||
+				window.location.hash.slice(1);
+			const target = "obsidian://pds-sync" + (params ? "?" + params : "");
+			document.getElementById("link").href = target;
+			window.location.replace(target);
+		</script>
+	</body>
+</html>
