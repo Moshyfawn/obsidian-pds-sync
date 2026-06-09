@@ -1,0 +1,14 @@
+# build output
+main.js
+*.js.map
+
+# deps
+node_modules/
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/
+
+# local secrets
+data.json
