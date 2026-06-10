@@ -1,12 +1,12 @@
 {
-  "client_id": "https://moshyfawn.tngl.io/obsidian-pds-sync/client-metadata.json",
+  "client_id": "https://obsidian-pds-sync.2877686.xyz/client-metadata.json",
   "client_name": "PDS Sync (Obsidian)",
-  "client_uri": "https://moshyfawn.tngl.io/obsidian-pds-sync",
+  "client_uri": "https://obsidian-pds-sync.2877686.xyz",
   "application_type": "web",
   "dpop_bound_access_tokens": true,
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
-  "redirect_uris": ["https://moshyfawn.tngl.io/obsidian-pds-sync/callback.html"],
+  "redirect_uris": ["https://obsidian-pds-sync.2877686.xyz/callback.html"],
   "scope": "atproto repo:site.standard.document repo:site.standard.publication repo:app.pdssync.note blob:*/*",
   "token_endpoint_auth_method": "none"
 }
