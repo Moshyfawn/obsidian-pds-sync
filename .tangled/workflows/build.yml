@@ -1,0 +1,19 @@
+when:
+  - event: ["push", "manual"]
+    branch: ["main"]
+  - event: ["pull_request"]
+    branch: ["main"]
+  - event: ["push"]
+    tag: ["*"]
+
+engine: "nixery"
+
+dependencies:
+  nixpkgs:
+    - bun
+
+steps:
+  - name: "Install dependencies"
+    command: "bun install --frozen-lockfile"
+  - name: "Typecheck and build"
+    command: "bun run build"
