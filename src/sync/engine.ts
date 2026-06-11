@@ -9,7 +9,7 @@ import {
 	writeIndex,
 	type SyncIndex,
 } from "./frontmatter";
-import { deriveTitle, stripFrontmatter } from "../util/markdown";
+import { stripFrontmatter } from "../util/markdown";
 import { shortHash, stableStringify } from "../util/hash";
 import type {
 	NoteInput,
@@ -104,9 +104,9 @@ export class SyncEngine {
 			fm ?? this.app.metadataCache.getFileCache(file)?.frontmatter ?? {};
 		const body = stripFrontmatter(await this.app.vault.cachedRead(file));
 		const title =
-			typeof front["title"] === "string" && front["title"].trim().length > 0
-				? front["title"]
-				: deriveTitle(body, file.basename);
+			typeof front["title"] === "string" && front["title"].trim()
+				? front["title"].trim()
+				: file.basename;
 		const frontmatter: Record<string, unknown> = { ...front };
 		for (const k of INDEX_KEYS) delete frontmatter[k];
 		return { body, title, frontmatter };

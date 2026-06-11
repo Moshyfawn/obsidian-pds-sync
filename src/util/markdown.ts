@@ -29,11 +29,3 @@ export function markdownToPlain(md: string): string {
 		.replace(/\n{3,}/g, "\n\n")
 		.trim();
 }
-
-/** Best-effort first heading or first non-empty line, for a fallback title. */
-export function deriveTitle(body: string, fallback: string): string {
-	const heading = body.match(/^#{1,6}\s+(.+)$/m);
-	if (heading) return heading[1].trim();
-	const firstLine = body.split(/\r?\n/).find((l) => l.trim().length > 0);
-	return (firstLine ?? fallback).trim().slice(0, 300);
-}
