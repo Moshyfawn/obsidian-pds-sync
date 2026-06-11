@@ -1,11 +1,11 @@
 {
   "id": "pds-sync",
   "name": "PDS Sync",
-  "version": "1.0.0",
-  "minAppVersion": "1.5.0",
-  "description": "Sync your vault to an atproto PDS",
+  "version": "1.0.1",
+  "minAppVersion": "1.11.4",
+  "description": "Sync your vault to an atproto PDS.",
   "author": "moshyfawn",
-  "authorUrl": "https://moshyfawn.dev",
+  "authorUrl": "https://bsky.app/profile/moshyfawn.dev",
   "fundingUrl": "https://at.fund/moshyfawn.dev",
   "isDesktopOnly": false
 }
