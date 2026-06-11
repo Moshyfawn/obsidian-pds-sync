@@ -306,10 +306,6 @@ export default class PdsSyncPlugin extends Plugin {
 				return;
 			}
 			try {
-				// Mobile WebViews only allow window.open during a live user gesture,
-				const authTab = Platform.isMobile
-					? window.open("", "_blank")
-					: null;
 				setupOAuth(
 					this.settings.oauthClientId,
 					this.settings.oauthRedirectUri,
@@ -318,8 +314,7 @@ export default class PdsSyncPlugin extends Plugin {
 					this.settings.identifier,
 					buildScope(this.settings),
 				);
-				if (authTab) authTab.location.href = url.toString();
-				else openExternal(url.toString());
+				openExternal(url.toString());
 				new Notice("PDS Sync: continue sign-in in your browser…");
 			} catch (err) {
 				new Notice(`PDS Sync: ${msg(err)}`);
@@ -677,7 +672,7 @@ function openExternal(url: string): void {
 			/* fall through to window.open */
 		}
 	}
-	window.open(url, "_blank");
+	window.open(url);
 }
 
 class PdsSyncSettingTab extends PluginSettingTab {
