@@ -1,0 +1,31 @@
+{
+  "lexicon": 1,
+  "id": "xyz.2877686.obsidian-pds-sync.note",
+  "defs": {
+    "main": {
+      "type": "record",
+      "key": "tid",
+      "description": "An end-to-end encrypted note. The ciphertext body is readable only with the user's passphrase-derived key.",
+      "record": {
+        "type": "object",
+        "required": ["enc", "kdf", "data"],
+        "properties": {
+          "enc": {
+            "type": "string",
+            "description": "Symmetric cipher used for `data`.",
+            "knownValues": ["AES-256-GCM"]
+          },
+          "kdf": {
+            "type": "string",
+            "description": "Key-derivation function for the encryption key.",
+            "knownValues": ["Argon2id"]
+          },
+          "data": {
+            "type": "bytes",
+            "description": "Ciphertext: a 12-byte IV followed by the AES-256-GCM output."
+          }
+        }
+      }
+    }
+  }
+}
