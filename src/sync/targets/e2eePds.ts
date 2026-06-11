@@ -59,8 +59,10 @@ export class E2eePdsTarget implements SyncTarget {
 			$type: this.collection,
 			enc: "AES-256-GCM",
 			kdf: "Argon2id",
-			data: await encryptJson(payload, this.key),
-			updatedAt: new Date().toISOString(),
+			// `bytes` field in atproto JSON form - the PDS stores it as compact
+			// CBOR bytes rather than base64 text. No envelope timestamp: the repo
+			// commit already records write time.
+			data: { $bytes: await encryptJson(payload, this.key) },
 		};
 	}
 
@@ -70,7 +72,7 @@ export class E2eePdsTarget implements SyncTarget {
 		value: Record<string, unknown>,
 	): Promise<PulledNote | null> {
 		if (!this.key) return null;
-		const data = (value as { data?: unknown }).data;
+		const data = (value as { data?: { $bytes?: unknown } }).data?.$bytes;
 		if (typeof data !== "string") return null;
 		try {
 			const p = await decryptJson<EncryptedPayload>(data, this.key);
