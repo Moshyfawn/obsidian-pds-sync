@@ -2,6 +2,7 @@ import {
 	App,
 	debounce,
 	type Debouncer,
+	Modal,
 	Notice,
 	Platform,
 	Plugin,
@@ -314,8 +315,14 @@ export default class PdsSyncPlugin extends Plugin {
 					this.settings.identifier,
 					buildScope(this.settings),
 				);
-				openExternal(url.toString());
-				new Notice("PDS Sync: continue sign-in in your browser…");
+				if (Platform.isDesktopApp) {
+					openExternal(url.toString());
+					new Notice(
+						"PDS Sync: continue sign-in in your browser…",
+					);
+				} else {
+					new PdsOAuthModal(this.app, url.toString()).open();
+				}
 			} catch (err) {
 				new Notice(`PDS Sync: ${msg(err)}`);
 			}
@@ -647,6 +654,46 @@ function buildBasicTheme(
 		accent: rgb(accent),
 		accentForeground: rgb(accentFg),
 	};
+}
+
+class PdsOAuthModal extends Modal {
+	constructor(
+		app: App,
+		private readonly url: string,
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.createEl("h3", { text: "Sign in to your PDS" });
+		contentEl.createEl("p", {
+			text: "Open the authorization page in your browser. After you sign in you'll be returned to Obsidian.",
+		});
+		new Setting(contentEl)
+			.addButton((b) =>
+				b
+					.setButtonText("Open sign-in page")
+					.setCta()
+					.onClick(() => window.open(this.url)),
+			)
+			.addButton((b) =>
+				b.setButtonText("Copy link").onClick(() => {
+					void navigator.clipboard?.writeText(this.url).then(
+						() => new Notice("PDS Sync: sign-in link copied."),
+						() => new Notice("PDS Sync: couldn't copy the link."),
+					);
+				}),
+			);
+		const hint = contentEl.createEl("p");
+		hint.appendText("Not opening? ");
+		hint.createEl("a", { text: "Tap this link", href: this.url });
+		hint.appendText(" or paste the copied link into your browser.");
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
 }
 
 function secretDesc(app: App): string {
