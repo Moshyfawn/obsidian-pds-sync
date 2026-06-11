@@ -29,7 +29,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 	return btoa(binary);
 }
 
-function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+function base64ToBytes(b64: string): Uint8Array {
 	const binary = atob(b64);
 	const out = new Uint8Array(binary.length);
 	for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
@@ -37,7 +37,7 @@ function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
 }
 
 /** Deterministic per-user salt: SHA-256 of a domain-separated DID. */
-async function saltFromDid(did: string): Promise<Uint8Array<ArrayBuffer>> {
+async function saltFromDid(did: string): Promise<Uint8Array> {
 	const digest = await crypto.subtle.digest(
 		"SHA-256",
 		new TextEncoder().encode(`pds-sync:${did}`),
