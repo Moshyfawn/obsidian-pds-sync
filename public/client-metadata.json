@@ -7,6 +7,6 @@
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
   "redirect_uris": ["https://obsidian-pds-sync.2877686.xyz/callback.html"],
-  "scope": "atproto repo:site.standard.document repo:site.standard.publication repo:app.pdssync.note blob:*/*",
+  "scope": "atproto repo:site.standard.document repo:site.standard.publication repo:xyz.2877686.obsidian-pds-sync.note blob:*/*",
   "token_endpoint_auth_method": "none"
 }

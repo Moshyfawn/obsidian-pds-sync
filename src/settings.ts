@@ -81,7 +81,7 @@ export const DEFAULT_SETTINGS: PdsSyncSettings = {
 		accent: "#3b6fed",
 		accentForeground: "#ffffff",
 	},
-	privateCollection: "app.pdssync.note",
+	privateCollection: "xyz.2877686.obsidian-pds-sync.note",
 	e2eePassphrase: "",
 	syncFolder: "",
 	autoSyncOnChange: false,
