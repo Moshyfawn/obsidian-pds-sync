@@ -306,6 +306,10 @@ export default class PdsSyncPlugin extends Plugin {
 				return;
 			}
 			try {
+				// Mobile WebViews only allow window.open during a live user gesture,
+				const authTab = Platform.isMobile
+					? window.open("", "_blank")
+					: null;
 				setupOAuth(
 					this.settings.oauthClientId,
 					this.settings.oauthRedirectUri,
@@ -314,9 +318,8 @@ export default class PdsSyncPlugin extends Plugin {
 					this.settings.identifier,
 					buildScope(this.settings),
 				);
-				// Give atcute a moment to persist PKCE/state to localStorage before we leave.
-				await sleep(150);
-				openExternal(url.toString());
+				if (authTab) authTab.location.href = url.toString();
+				else openExternal(url.toString());
 				new Notice("PDS Sync: continue sign-in in your browser…");
 			} catch (err) {
 				new Notice(`PDS Sync: ${msg(err)}`);
@@ -655,10 +658,6 @@ function secretDesc(app: App): string {
 	return keychainAvailable(app)
 		? "Stored in your OS keychain."
 		: "Stored in data.json (no keychain on this Obsidian version).";
-}
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 /** Open a URL in the system browser (works on desktop and mobile). */
