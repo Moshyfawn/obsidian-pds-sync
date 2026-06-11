@@ -49,6 +49,7 @@ export default class PdsSyncPlugin extends Plugin {
 	settings!: PdsSyncSettings;
 	client!: AtpClient;
 	private e2eeKey: CryptoKey | null = null;
+	private oauthModal: PdsOAuthModal | null = null;
 	private settingTab?: PdsSyncSettingTab;
 	private statusBarEl?: HTMLElement;
 	private dirty = new Set<string>();
@@ -321,7 +322,11 @@ export default class PdsSyncPlugin extends Plugin {
 						"PDS Sync: continue sign-in in your browser…",
 					);
 				} else {
-					new PdsOAuthModal(this.app, url.toString()).open();
+					this.oauthModal = new PdsOAuthModal(
+						this.app,
+						url.toString(),
+					);
+					this.oauthModal.open();
 				}
 			} catch (err) {
 				new Notice(`PDS Sync: ${msg(err)}`);
@@ -344,6 +349,8 @@ export default class PdsSyncPlugin extends Plugin {
 			if (k !== "action" && typeof v === "string") search.set(k, v);
 		}
 		if (!search.has("code") && !search.has("error")) return;
+		this.oauthModal?.close();
+		this.oauthModal = null;
 		try {
 			setupOAuth(
 				this.settings.oauthClientId,
@@ -665,12 +672,11 @@ class PdsOAuthModal extends Modal {
 	}
 
 	onOpen(): void {
-		const { contentEl } = this;
-		contentEl.createEl("h3", { text: "Sign in to your PDS" });
-		contentEl.createEl("p", {
-			text: "Open the authorization page in your browser. After you sign in you'll be returned to Obsidian.",
-		});
-		new Setting(contentEl)
+		new Setting(this.contentEl)
+			.setName("Sign in to your PDS")
+			.setDesc(
+				"Open the page in your browser; you'll return here automatically.",
+			)
 			.addButton((b) =>
 				b
 					.setButtonText("Open sign-in page")
@@ -685,10 +691,6 @@ class PdsOAuthModal extends Modal {
 					);
 				}),
 			);
-		const hint = contentEl.createEl("p");
-		hint.appendText("Not opening? ");
-		hint.createEl("a", { text: "Tap this link", href: this.url });
-		hint.appendText(" or paste the copied link into your browser.");
 	}
 
 	onClose(): void {
