@@ -82,14 +82,18 @@ export async function writeIndex(
 	file: TFile,
 	index: SyncIndex,
 ): Promise<void> {
-	await app.fileManager.processFrontMatter(file, (fm) =>
-		applyIndex(fm, index),
+	await app.fileManager.processFrontMatter(
+		file,
+		(fm: Record<string, unknown>) => applyIndex(fm, index),
 	);
 }
 
 /** Remove the index keys (e.g. after a remote delete). */
 export async function clearIndex(app: App, file: TFile): Promise<void> {
-	await app.fileManager.processFrontMatter(file, (fm) => {
-		for (const k of Object.values(KEY)) delete fm[k];
-	});
+	await app.fileManager.processFrontMatter(
+		file,
+		(fm: Record<string, unknown>) => {
+			for (const k of Object.values(KEY)) delete fm[k];
+		},
+	);
 }

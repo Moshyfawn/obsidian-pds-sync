@@ -105,7 +105,7 @@ export class SyncEngine {
 		const body = stripFrontmatter(await this.app.vault.cachedRead(file));
 		const title =
 			typeof front["title"] === "string" && front["title"].trim().length > 0
-				? (front["title"] as string)
+				? front["title"]
 				: deriveTitle(body, file.basename);
 		const frontmatter: Record<string, unknown> = { ...front };
 		for (const k of INDEX_KEYS) delete frontmatter[k];
@@ -118,10 +118,10 @@ export class SyncEngine {
 	): Promise<NoteInput> {
 		const { body, title, frontmatter } = await this.localParts(file, fm);
 		const slug =
-			typeof fm["slug"] === "string" ? (fm["slug"] as string) : undefined;
+			typeof fm["slug"] === "string" ? fm["slug"] : undefined;
 		const published =
 			typeof fm["publishedAt"] === "string"
-				? (fm["publishedAt"] as string)
+				? fm["publishedAt"]
 				: new Date(file.stat.ctime).toISOString();
 		return {
 			path: file.path,
@@ -476,19 +476,23 @@ export class SyncEngine {
 			file = await this.app.vault.create(norm, note.markdown);
 		}
 
-		await this.app.fileManager.processFrontMatter(file, (fm) => {
-			if (note.frontmatter) {
-				for (const [k, v] of Object.entries(note.frontmatter)) fm[k] = v;
-			}
-			if (fm["title"] === undefined) fm["title"] = note.title;
-			fm[flagKey] = true;
-			applyIndex(fm, {
-				target: targetId,
-				ref,
-				hash,
-				syncedAt: new Date().toISOString(),
-			});
-		});
+		await this.app.fileManager.processFrontMatter(
+			file,
+			(fm: Record<string, unknown>) => {
+				if (note.frontmatter) {
+					for (const [k, v] of Object.entries(note.frontmatter))
+						fm[k] = v;
+				}
+				if (fm["title"] === undefined) fm["title"] = note.title;
+				fm[flagKey] = true;
+				applyIndex(fm, {
+					target: targetId,
+					ref,
+					hash,
+					syncedAt: new Date().toISOString(),
+				});
+			},
+		);
 	}
 
 	private async ensureParent(path: string): Promise<void> {
