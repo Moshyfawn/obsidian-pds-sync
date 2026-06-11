@@ -119,9 +119,9 @@ export default class PdsSyncPlugin extends Plugin {
 			name: "Sync current note to PDS",
 			checkCallback: (checking) => {
 				const file = this.app.workspace.getActiveFile();
-				const ok = !!file && file.extension === "md";
-				if (ok && !checking) void this.runSyncFile(file as TFile);
-				return ok;
+				if (!file || file.extension !== "md") return false;
+				if (!checking) void this.runSyncFile(file);
+				return true;
 			},
 		});
 
@@ -156,11 +156,8 @@ export default class PdsSyncPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			await this.loadData(),
-		);
+		const data = (await this.loadData()) as Partial<PdsSyncSettings> | null;
+		this.settings = { ...DEFAULT_SETTINGS, ...(data ?? {}) };
 	}
 
 	async saveSettings(): Promise<void> {
@@ -818,7 +815,6 @@ class PdsSyncSettingTab extends PluginSettingTab {
 				sl
 					.setLimits(0, 120, 5)
 					.setValue(s.autoSyncIntervalMinutes)
-					.setDynamicTooltip()
 					.onChange(async (v) => {
 						s.autoSyncIntervalMinutes = v;
 						await this.plugin.saveSettings();
