@@ -1,6 +1,6 @@
 {
   "name": "obsidian-pds-sync",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Sync your Obsidian vault to an atproto PDS.",
   "type": "module",
   "main": "main.js",
