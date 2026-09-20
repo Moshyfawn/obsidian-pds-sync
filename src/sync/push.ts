@@ -60,3 +60,21 @@ export async function casPush(
 		return { status: "conflict", remote, current: currentRef };
 	}
 }
+
+export async function casDelete(
+	client: AtpClient,
+	collection: string,
+	ref: RemoteRef,
+): Promise<void> {
+	try {
+		await client.deleteRecord(collection, ref.rkey, ref.cid);
+	} catch (err) {
+		if (!(err instanceof XrpcError)) throw err;
+		if (err.code === "RecordNotFound") return;
+		if (err.code === "InvalidSwap")
+			throw new Error(
+				`${ref.rkey} changed on the PDS since the last sync - not deleted. Pull first, then remove it again.`,
+			);
+		throw err;
+	}
+}
