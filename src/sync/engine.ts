@@ -12,6 +12,7 @@ import {
 import { stripFrontmatter } from "../util/markdown";
 import { shortHash, stableStringify } from "../util/hash";
 import type {
+	ListResult,
 	NoteInput,
 	PulledNote,
 	RemoteRef,
@@ -30,7 +31,7 @@ export interface SyncOutcome {
 }
 
 /** Frontmatter-aware content hash, so any change (body or user frontmatter) is detected. */
-function noteHash(
+export function noteHash(
 	targetId: TargetId,
 	note: {
 		frontmatter?: Record<string, unknown>;
@@ -41,6 +42,15 @@ function noteHash(
 	return shortHash(
 		`${targetId}\n${stableStringify(note.frontmatter ?? {})}\n${note.title}\n${note.markdown}`,
 	);
+}
+
+type FlagKey = "pds" | "publish";
+
+interface NoteStamp {
+	targetId: TargetId;
+	flagKey: FlagKey;
+	ref: RemoteRef;
+	hash: string;
 }
 
 export interface PullOutcome {
@@ -205,7 +215,6 @@ export class SyncEngine {
 				prevAtStart && prevAtStart.target === target.id
 					? prevAtStart.ref
 					: undefined;
-			const flagKey = target.id === "standard-site" ? "publish" : "pds";
 			const result = await target.push(this.client, note, existing);
 
 			if (result.status === "conflict") {
@@ -213,15 +222,7 @@ export class SyncEngine {
 				// the remote as our new base; the local edit re-pushes next sync.
 				const remoteHash = await noteHash(target.id, result.remote.note);
 				const cpath = conflictPath(file.path, result.current.rkey);
-				await this.writeRemoteNote(
-					cpath,
-					result.remote.note,
-					result.current,
-					remoteHash,
-					target.id,
-					flagKey,
-					false,
-				);
+				await this.writeNote(cpath, result.remote.note, null, false);
 				await writeIndex(this.app, file, {
 					target: target.id,
 					ref: result.current,
@@ -323,18 +324,17 @@ export class SyncEngine {
 		// only documents in our publication).
 		for (const target of targets) {
 			const flagKey = target.id === "standard-site" ? "publish" : "pds";
-			let pulled: PulledNote[];
+			let listed: ListResult;
 			try {
-				pulled = await target.list(this.client);
+				listed = await target.list(this.client);
 			} catch (err) {
 				outcome.failed++;
 				outcome.errors.push(`${target.id}: ${errText(err)}`);
 				continue;
 			}
-			const remoteRkeys = new Set(pulled.map((p) => p.ref.rkey));
 
 			// 1. Remote -> local: restore / remote-wins update / conflict copy.
-			for (const p of pulled) {
+			for (const p of listed.notes) {
 				try {
 					await this.reconcile(target.id, flagKey, p, byRkey, outcome);
 				} catch (err) {
@@ -345,7 +345,8 @@ export class SyncEngine {
 
 			// 2. This backend's local notes whose record is gone remotely -> reflect deletion.
 			for (const { file, idx } of localIndexed) {
-				if (idx.target !== target.id || remoteRkeys.has(idx.ref.rkey)) continue;
+				if (idx.target !== target.id || listed.rkeys.has(idx.ref.rkey))
+					continue;
 				try {
 					await this.handleRemoteDeletion(target.id, file, idx, outcome);
 				} catch (err) {
@@ -387,24 +388,22 @@ export class SyncEngine {
 
 	private async reconcile(
 		targetId: TargetId,
-		flagKey: "pds" | "publish",
+		flagKey: FlagKey,
 		p: PulledNote,
 		byRkey: Map<string, TFile>,
 		outcome: PullOutcome,
 	): Promise<void> {
 		const remoteHash = await noteHash(targetId, p.note);
+		const stamp: NoteStamp = {
+			targetId,
+			flagKey,
+			ref: p.ref,
+			hash: remoteHash,
+		};
 		const local = byRkey.get(p.ref.rkey);
 
 		if (!local) {
-			await this.writeRemoteNote(
-				p.note.path,
-				p.note,
-				p.ref,
-				remoteHash,
-				targetId,
-				flagKey,
-				false,
-			);
+			await this.writeNote(p.note.path, p.note, stamp, false);
 			outcome.restored++;
 			return;
 		}
@@ -426,44 +425,29 @@ export class SyncEngine {
 		});
 
 		if (idx && localHash === idx.hash) {
-			await this.writeRemoteNote(
-				local.path,
-				p.note,
-				p.ref,
-				remoteHash,
-				targetId,
-				flagKey,
-				true,
-			);
+			await this.writeNote(local.path, p.note, stamp, true);
 			outcome.updated++;
 		} else {
-			const conflict = conflictPath(local.path, p.ref.rkey);
-			await this.writeRemoteNote(
-				conflict,
+			await this.writeNote(
+				conflictPath(local.path, p.ref.rkey),
 				p.note,
-				p.ref,
-				remoteHash,
-				targetId,
-				flagKey,
+				null,
 				false,
 			);
 			outcome.conflicts++;
 		}
 	}
 
-	/** Write a remote note to disk (body + reconstructed index/frontmatter). */
-	private async writeRemoteNote(
+	/** An unstamped write is a conflict copy; trashing it must not delete the original. */
+	private async writeNote(
 		path: string,
 		note: NoteInput,
-		ref: RemoteRef,
-		hash: string,
-		targetId: TargetId,
-		flagKey: "pds" | "publish",
+		stamp: NoteStamp | null,
 		overwrite: boolean,
 	): Promise<void> {
 		let norm = normalizePath(path.endsWith(".md") ? path : `${path}.md`);
 		if (!overwrite && this.app.vault.getAbstractFileByPath(norm)) {
-			norm = normalizePath(`${norm.replace(/\.md$/, "")} (pds ${ref.rkey}).md`);
+			norm = this.freePath(norm, stamp ? ` (pds ${stamp.ref.rkey})` : "");
 		}
 		await this.ensureParent(norm);
 
@@ -484,15 +468,29 @@ export class SyncEngine {
 						fm[k] = v;
 				}
 				if (fm["title"] === undefined) fm["title"] = note.title;
-				fm[flagKey] = true;
+				if (!stamp) {
+					for (const k of [...INDEX_KEYS, "pds", "publish"])
+						delete fm[k];
+					return;
+				}
+				fm[stamp.flagKey] = true;
 				applyIndex(fm, {
-					target: targetId,
-					ref,
-					hash,
+					target: stamp.targetId,
+					ref: stamp.ref,
+					hash: stamp.hash,
 					syncedAt: new Date().toISOString(),
 				});
 			},
 		);
+	}
+
+	private freePath(norm: string, marker: string): string {
+		const base = norm.replace(/\.md$/, "") + marker;
+		let candidate = normalizePath(`${base}.md`);
+		for (let n = 2; this.app.vault.getAbstractFileByPath(candidate); n++) {
+			candidate = normalizePath(`${base} ${n}.md`);
+		}
+		return candidate;
 	}
 
 	private async ensureParent(path: string): Promise<void> {

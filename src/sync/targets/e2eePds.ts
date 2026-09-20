@@ -1,7 +1,8 @@
 import type { AtpClient } from "../../atproto/client";
 import { decryptJson, encryptJson } from "../../crypto/e2ee";
-import { casPush, rkeyFromUri } from "../push";
+import { casDelete, casPush, rkeyFromUri } from "../push";
 import type {
+	ListResult,
 	NoteInput,
 	PulledNote,
 	PushResult,
@@ -108,12 +109,12 @@ export class E2eePdsTarget implements SyncTarget {
 	}
 
 	async delete(client: AtpClient, ref: RemoteRef): Promise<void> {
-		await client.deleteRecord(this.collection, ref.rkey);
+		await casDelete(client, this.collection, ref);
 	}
 
-	async list(client: AtpClient): Promise<PulledNote[]> {
+	async list(client: AtpClient): Promise<ListResult> {
 		if (!this.key) throw new Error(this.readyError());
-		const out: PulledNote[] = [];
+		const listed: ListResult = { rkeys: new Set(), notes: [] };
 		let cursor: string | undefined;
 		do {
 			const page = await client.listRecords(this.collection, {
@@ -121,11 +122,12 @@ export class E2eePdsTarget implements SyncTarget {
 				cursor,
 			});
 			for (const rec of page.records) {
+				listed.rkeys.add(rkeyFromUri(rec.uri));
 				const note = await this.decode(rec.uri, rec.cid, rec.value);
-				if (note) out.push(note);
+				if (note) listed.notes.push(note);
 			}
 			cursor = page.cursor;
 		} while (cursor);
-		return out;
+		return listed;
 	}
 }

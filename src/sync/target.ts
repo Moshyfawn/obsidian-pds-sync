@@ -40,6 +40,12 @@ export interface PulledNote {
 	note: NoteInput;
 }
 
+/** `rkeys` must stay unfiltered: an unreadable record is not a deleted one. */
+export interface ListResult {
+	rkeys: Set<string>;
+	notes: PulledNote[];
+}
+
 /**
  * Outcome of a push. "written" = the record was created/updated/recreated.
  * "conflict" = the remote record changed under us; the caller resolves it
@@ -67,8 +73,8 @@ export interface SyncTarget {
 		note: NoteInput,
 		existing?: RemoteRef,
 	): Promise<PushResult>;
-	/** Delete the record for an orphaned note. */
+	/** Delete the record for an orphaned note, guarded by `ref.cid`. */
 	delete(client: AtpClient, ref: RemoteRef): Promise<void>;
 	/** Fetch every record in this collection, decoded into notes (for pull/restore). */
-	list(client: AtpClient): Promise<PulledNote[]>;
+	list(client: AtpClient): Promise<ListResult>;
 }
