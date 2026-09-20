@@ -36,6 +36,10 @@ import {
 	PUBLICATION_COLLECTION,
 	type PdsSyncSettings,
 } from "./settings";
+import {
+	DeletionQueue,
+	type DeletionQueueHost,
+} from "./sync/deletions";
 import { SyncEngine, type SyncOutcome } from "./sync/engine";
 import { readIndex, type SyncIndex } from "./sync/frontmatter";
 import type { SyncTarget, TargetId } from "./sync/target";
@@ -52,6 +56,7 @@ export default class PdsSyncPlugin extends Plugin {
 	private oauthModal: PdsOAuthModal | null = null;
 	private settingTab?: PdsSyncSettingTab;
 	private statusBarEl?: HTMLElement;
+	private deletions!: DeletionQueue;
 	private dirty = new Set<string>();
 	private autoSyncDebounced?: Debouncer<[], void>;
 	private intervalId: number | null = null;
@@ -74,11 +79,15 @@ export default class PdsSyncPlugin extends Plugin {
 			(params) => void this.handleOAuthCallback(params),
 		);
 
-		// When a synced note is deleted from the vault, delete its remote record.
+		this.deletions = new DeletionQueue(this.deletionHost(), [
+			...this.settings.pendingDeletions,
+		]);
 		this.registerEvent(
-			this.app.metadataCache.on("deleted", (_file, prevCache) => {
-				const idx = readIndex(prevCache?.frontmatter);
-				if (idx) void this.deleteRemoteRecord(idx);
+			this.app.metadataCache.on("deleted", (file, prevCache) => {
+				void this.deletions.enqueue(
+					file.path,
+					readIndex(prevCache?.frontmatter),
+				);
 			}),
 		);
 
@@ -378,6 +387,7 @@ export default class PdsSyncPlugin extends Plugin {
 		new Notice("PDS Sync: syncing vault…");
 		this.setStatus("syncing");
 		const outcome = await this.engine().syncVault();
+		await this.flushDeletions(outcome);
 		this.setStatus(outcome.failed > 0 ? "error" : "idle");
 		this.notify(outcome);
 	}
@@ -419,6 +429,7 @@ export default class PdsSyncPlugin extends Plugin {
 			const f = this.app.vault.getAbstractFileByPath(p);
 			if (f instanceof TFile) await engine.syncFile(f, outcome);
 		}
+		await this.flushDeletions(outcome);
 		this.setStatus(outcome.failed > 0 ? "error" : "idle");
 		if (outcome.failed > 0)
 			console.error("PDS auto-sync errors:", outcome.errors);
@@ -447,6 +458,7 @@ export default class PdsSyncPlugin extends Plugin {
 		}
 		this.setStatus("syncing");
 		const outcome = await this.engine().syncVault();
+		await this.flushDeletions(outcome);
 		this.setStatus(outcome.failed > 0 ? "error" : "idle");
 		if (outcome.failed > 0)
 			console.error("PDS interval-sync errors:", outcome.errors);
@@ -569,21 +581,35 @@ export default class PdsSyncPlugin extends Plugin {
 		this.notify(outcome, file.basename);
 	}
 
-	private async deleteRemoteRecord(idx: SyncIndex): Promise<void> {
-		if (!this.client.isLoggedIn) {
-			console.warn(
-				`[pds-sync] note deleted while offline; remote record orphaned: ${idx.ref.rkey}`,
-			);
-			return;
-		}
-		try {
-			await this.buildTargets()
-				.get(idx.target)
-				?.delete(this.client, idx.ref);
-			new Notice("PDS Sync: removed deleted note from PDS.");
-		} catch (err) {
-			console.warn("[pds-sync] failed to delete remote record:", err);
-		}
+	private deletionHost(): DeletionQueueHost {
+		const indexOf = (file: TFile): SyncIndex | null =>
+			readIndex(this.app.metadataCache.getFileCache(file)?.frontmatter);
+		return {
+			exists: (path) =>
+				this.app.vault.getAbstractFileByPath(path) instanceof TFile,
+			claimed: (rkey) =>
+				this.app.vault
+					.getMarkdownFiles()
+					.some((f) => indexOf(f)?.ref.rkey === rkey),
+			remove: async (idx) => {
+				if (!this.client.isLoggedIn)
+					throw new Error("not connected - record left on the PDS");
+				const target = this.buildTargets().get(idx.target);
+				if (!target) throw new Error(`unknown backend ${idx.target}`);
+				await target.delete(this.client, idx.ref);
+			},
+			save: async (pending) => {
+				this.settings.pendingDeletions = pending;
+				await this.saveSettings();
+			},
+		};
+	}
+
+	private async flushDeletions(outcome: SyncOutcome): Promise<void> {
+		const flushed = await this.deletions.flush();
+		outcome.deleted += flushed.deleted;
+		outcome.failed += flushed.errors.length;
+		outcome.errors.push(...flushed.errors);
 	}
 
 	private notify(o: SyncOutcome, label?: string): void {
