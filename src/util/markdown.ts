@@ -1,18 +1,8 @@
-/**
- * Frontmatter-aware markdown helpers.
- *
- * Obsidian's metadata cache parses frontmatter for us (we use it for values),
- * but syncing needs the *body* with the block removed. We strip it from the
- * freshly-read text rather than slicing by the cache's frontmatterPosition /
- * headings, which are snapshots that can lag a file that just changed - these
- * operate on the exact bytes we're about to push, so they can't drift.
- */
+import { getFrontMatterInfo } from "obsidian";
 
-const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
-
-/** Strip a leading YAML frontmatter block, returning just the note body. */
+/** Works on the file's current text, because the metadata cache can lag a recent edit. */
 export function stripFrontmatter(content: string): string {
-	return content.replace(FRONTMATTER_RE, "").replace(/^\s+/, "");
+	return content.slice(getFrontMatterInfo(content).contentStart);
 }
 
 /** Light markdown -> plaintext, for the `textContent` fallback (which must not contain formatting). */
