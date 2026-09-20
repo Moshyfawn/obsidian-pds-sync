@@ -81,6 +81,11 @@ export async function finishOAuthLogin(
 export async function resumeOAuth(did: string): Promise<AuthResult> {
 	const session = await getSession(did as never, { allowStale: true });
 	const agent = new OAuthUserAgent(session);
+	if (agent.sub !== did) {
+		throw new Error(
+			`stored session is for ${agent.sub}, not ${did} - sign in again`,
+		);
+	}
 	return { rpc: new Client({ handler: agent }), did: agent.sub };
 }
 
