@@ -952,19 +952,30 @@ class PdsSyncSettingTab extends PluginSettingTab {
 						SECRET_E2EE_PASSPHRASE,
 						s.e2eePassphrase,
 					),
-				).onChange(async (v) => {
-					s.e2eePassphrase = writeSecret(
-						this.app,
-						SECRET_E2EE_PASSPHRASE,
-						v,
-					)
-						? ""
-						: v;
-					await this.plugin.saveSettings();
-					await this.plugin.deriveE2eeKey();
+				);
+				t.inputEl.addEventListener("blur", () => {
+					void this.commitPassphrase(t.getValue());
 				});
 			});
 
+		this.publicSettings(containerEl, s);
+	}
+
+	private async commitPassphrase(value: string): Promise<void> {
+		const s = this.plugin.settings;
+		if (value === readSecret(this.app, SECRET_E2EE_PASSPHRASE, s.e2eePassphrase))
+			return;
+		s.e2eePassphrase = writeSecret(this.app, SECRET_E2EE_PASSPHRASE, value)
+			? ""
+			: value;
+		await this.plugin.saveSettings();
+		await this.plugin.deriveE2eeKey();
+	}
+
+	private publicSettings(
+		containerEl: HTMLElement,
+		s: PdsSyncSettings,
+	): void {
 		new Setting(containerEl).setName("Public (standard.site)").setHeading();
 
 		new Setting(containerEl).setName("Publication name").addText((t) =>
