@@ -124,10 +124,16 @@ export class AtpClient {
 		return this.unwrap<{ blob: unknown }>(res, "uploadBlob").blob;
 	}
 
-	async deleteRecord(collection: string, rkey: string): Promise<void> {
+	async deleteRecord(
+		collection: string,
+		rkey: string,
+		swapRecord?: string,
+	): Promise<void> {
 		const { rpc, did } = this.ctx();
+		const input: Record<string, unknown> = { repo: did, collection, rkey };
+		if (swapRecord) input.swapRecord = swapRecord;
 		const res = (await rpc.post("com.atproto.repo.deleteRecord", {
-			input: { repo: did, collection, rkey } as never,
+			input: input as never,
 		})) as XrpcResponse;
 		this.unwrap(res, "deleteRecord");
 	}
