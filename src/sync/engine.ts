@@ -1,4 +1,10 @@
-import { type App, Notice, TFile, normalizePath } from "obsidian";
+import {
+	type App,
+	type DataWriteOptions,
+	Notice,
+	TFile,
+	normalizePath,
+} from "obsidian";
 import type { AtpClient } from "../atproto/client";
 import type { PdsSyncSettings } from "../settings";
 import {
@@ -451,13 +457,14 @@ export class SyncEngine {
 		}
 		await this.ensureParent(norm);
 
+		const times = writeTimes(note);
 		const current = this.app.vault.getAbstractFileByPath(norm);
 		let file: TFile;
 		if (current instanceof TFile) {
-			await this.app.vault.modify(current, note.markdown);
+			await this.app.vault.modify(current, note.markdown, times);
 			file = current;
 		} else {
-			file = await this.app.vault.create(norm, note.markdown);
+			file = await this.app.vault.create(norm, note.markdown, times);
 		}
 
 		await this.app.fileManager.processFrontMatter(
@@ -481,6 +488,7 @@ export class SyncEngine {
 					syncedAt: new Date().toISOString(),
 				});
 			},
+			times,
 		);
 	}
 
@@ -501,6 +509,16 @@ export class SyncEngine {
 			await this.app.vault.createFolder(dir).catch(() => undefined);
 		}
 	}
+}
+
+/** A missing or unreadable timestamp is left out, so Obsidian sets it instead. */
+function writeTimes(note: NoteInput): DataWriteOptions {
+	const ctime = Date.parse(note.publishedAt);
+	const mtime = note.updatedAt ? Date.parse(note.updatedAt) : ctime;
+	const times: DataWriteOptions = {};
+	if (ctime > 0) times.ctime = ctime;
+	if (mtime > 0) times.mtime = mtime;
+	return times;
 }
 
 function conflictPath(localPath: string, rkey: string): string {
