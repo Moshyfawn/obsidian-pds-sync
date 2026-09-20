@@ -16,6 +16,7 @@ import {
 	type SyncIndex,
 } from "./frontmatter";
 import { stripFrontmatter } from "../util/markdown";
+import { FLAG_PRIVATE, FLAG_PUBLIC, type FlagKey, flagged } from "./flags";
 import { shortHash, stableStringify } from "../util/hash";
 import type {
 	ListResult,
@@ -32,6 +33,8 @@ export interface SyncOutcome {
 	deleted: number;
 	conflicts: number;
 	skipped: number;
+	/** How many of the skipped notes had no opt-in flag. */
+	unflagged: number;
 	failed: number;
 	errors: string[];
 }
@@ -49,8 +52,6 @@ export function noteHash(
 		`${targetId}\n${stableStringify(note.frontmatter ?? {})}\n${note.title}\n${note.markdown}`,
 	);
 }
-
-type FlagKey = "pds" | "publish";
 
 interface NoteStamp {
 	targetId: TargetId;
@@ -86,17 +87,17 @@ export class SyncEngine {
 	/**
 	 * Decide which backend a note goes to, or null to skip/unpublish it.
 	 *
-	 * Routing is driven purely by the user's intent flags (`publish` / `pds`),
-	 * NOT by our own `pds_target` index key - otherwise setting `publish: false`
-	 * couldn't unpublish, because the index would keep forcing a sync.
+	 * Routing is driven purely by the user's intent flags, NOT by the
+	 * `pds_target` index key - otherwise clearing a flag couldn't unpublish,
+	 * because the index would keep forcing a sync.
 	 */
 	private selectTarget(
 		frontmatter: Record<string, unknown> | undefined,
 	): SyncTarget | null {
 		const fm = frontmatter ?? {};
-		if (fm["publish"] === true)
+		if (flagged(fm[FLAG_PUBLIC]))
 			return this.targets.get("standard-site") ?? null;
-		if (fm["pds"] === true) return this.targets.get("e2ee-pds") ?? null;
+		if (flagged(fm[FLAG_PRIVATE])) return this.targets.get("e2ee-pds") ?? null;
 		return null; // opt-in by default; false/absent flag -> unpublish if previously synced
 	}
 
@@ -178,6 +179,7 @@ export class SyncEngine {
 			} else {
 				console.debug(`[pds-sync] ${file.path}: no backend selected -> skip`);
 				outcome.skipped++;
+				outcome.unflagged++;
 			}
 			return;
 		}
@@ -270,6 +272,7 @@ export class SyncEngine {
 			deleted: 0,
 			conflicts: 0,
 			skipped: 0,
+			unflagged: 0,
 			failed: 0,
 			errors: [],
 		};
@@ -329,7 +332,8 @@ export class SyncEngine {
 		// Each backend pulls only its own scope (e2ee = our collection; standard-site =
 		// only documents in our publication).
 		for (const target of targets) {
-			const flagKey = target.id === "standard-site" ? "publish" : "pds";
+			const flagKey: FlagKey =
+				target.id === "standard-site" ? FLAG_PUBLIC : FLAG_PRIVATE;
 			let listed: ListResult;
 			try {
 				listed = await target.list(this.client);
@@ -476,7 +480,7 @@ export class SyncEngine {
 				}
 				if (fm["title"] === undefined) fm["title"] = note.title;
 				if (!stamp) {
-					for (const k of [...INDEX_KEYS, "pds", "publish"])
+					for (const k of [...INDEX_KEYS, FLAG_PRIVATE, FLAG_PUBLIC])
 						delete fm[k];
 					return;
 				}

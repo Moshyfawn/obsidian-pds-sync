@@ -3,7 +3,7 @@
 Sync your Obsidian vault to an [atproto](https://atproto.com) Personal Data Server (PDS). Two backends, one engine:
 
 - **Private (default)** - notes are encrypted client-side (Argon2id + AES-256-GCM) and stored as opaque records on your PDS. Only you can read them.
-- **Public** - notes you mark `publish: true` become [`site.standard.document`](https://standard.site) records, displayed by standard.site readers such as Leaflet.
+- **Public** - notes you mark `pds_publish: true` become [`site.standard.document`](https://standard.site) records, displayed by standard.site readers such as Leaflet.
 
 ## Features
 
@@ -24,7 +24,7 @@ Download `main.js` + `manifest.json` from a release (Tangled tag artifacts) - or
 
 ```yaml
 ---
-pds: true # encrypt + sync privately (or  publish: true  to publish publicly)
+pds: true # encrypt + sync privately (or  pds_publish: true  to publish publicly)
 ---
 ```
 
@@ -48,7 +48,7 @@ Private notes are encrypted client-side with **AES-256-GCM**, the key derived by
 ## Configuration
 
 - **Credentials** - on Obsidian 1.11.4+ the app password and passphrase are stored in your **OS keychain**; older versions fall back to a gitignored local `data.json` (don't keep that folder inside a vault you publish). App-password JWTs are never persisted (re-login each launch); OAuth tokens live in local storage.
-- **Routing** - `pds: true` -> private, `publish: true` -> public; remove or set the flag to `false` to unpublish.
+- **Routing** - `pds: true` -> private, `pds_publish: true` -> public; remove or set the flag to `false` to unpublish.
 - **Auto-sync** - push-only; toggle on-change and/or an interval. The status-bar item shows state (synced / syncing / error / not connected).
 - **Public** - the publication helper writes a `site.standard.publication` and auto-fills the Publication URI your documents reference.
 - **OAuth host** - the `client_id` doc + redirect page (in `public/`) are served at `obsidian-pds-sync.2877686.xyz`. To self-host, serve `public/` at a host root and update the metadata + settings together.

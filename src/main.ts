@@ -41,6 +41,7 @@ import {
 	type DeletionQueueHost,
 } from "./sync/deletions";
 import { SyncEngine, type SyncOutcome } from "./sync/engine";
+import { migratePublishFlag } from "./sync/migrate";
 import { readIndex, type SyncIndex } from "./sync/frontmatter";
 import type { SyncTarget, TargetId } from "./sync/target";
 import { StandardSiteTarget } from "./sync/targets/standardSite";
@@ -90,6 +91,9 @@ export default class PdsSyncPlugin extends Plugin {
 				);
 			}),
 		);
+
+		// The metadata cache is empty until layout is ready.
+		this.app.workspace.onLayoutReady(() => void this.migratePublishFlag());
 
 		// Resume an existing session silently.
 		await this.ensureLogin(true);
@@ -366,12 +370,20 @@ export default class PdsSyncPlugin extends Plugin {
 				this.settings.oauthRedirectUri,
 			);
 			const { rpc, did } = await finishOAuthLogin(search);
+			const previous = this.settings.oauthDid;
 			this.client.attach(rpc, did);
 			await this.client.ensureHandle();
 			await this.afterConnect();
 			this.settings.oauthDid = did;
 			await this.saveSettings();
-			new Notice(`PDS Sync: connected as ${this.client.handle ?? did}`);
+			if (previous && previous !== did) {
+				new Notice(
+					`PDS Sync: signed in as ${did}, but this vault was synced under ${previous}. Records from the old account will not decrypt.`,
+					10000,
+				);
+			} else {
+				new Notice(`PDS Sync: connected as ${this.client.handle ?? did}`);
+			}
 			this.setStatus("idle");
 			this.settingTab?.display(); // refresh the (possibly open) settings pane
 		} catch (err) {
@@ -574,6 +586,7 @@ export default class PdsSyncPlugin extends Plugin {
 			deleted: 0,
 			conflicts: 0,
 			skipped: 0,
+			unflagged: 0,
 			failed: 0,
 			errors: [],
 		};
@@ -605,6 +618,21 @@ export default class PdsSyncPlugin extends Plugin {
 		};
 	}
 
+	private async migratePublishFlag(): Promise<void> {
+		if (this.settings.publishFlagMigrated) return;
+		try {
+			const moved = await migratePublishFlag(this.app);
+			this.settings.publishFlagMigrated = true;
+			await this.saveSettings();
+			if (moved > 0)
+				new Notice(
+					`PDS Sync: moved 'publish' to 'pds_publish' on ${moved} note(s), so the plugin no longer reads Obsidian Publish's property.`,
+				);
+		} catch (err) {
+			console.error("[pds-sync] publish flag migration failed:", err);
+		}
+	}
+
 	private async flushDeletions(outcome: SyncOutcome): Promise<void> {
 		const flushed = await this.deletions.flush();
 		outcome.deleted += flushed.deleted;
@@ -621,6 +649,12 @@ export default class PdsSyncPlugin extends Plugin {
 				`${head}: ${tail}, ${o.failed} failed.\n${o.errors[0] ?? ""}`,
 			);
 		} else if (o.created + o.updated + o.deleted + o.conflicts === 0) {
+			if (o.unflagged > 0 && o.unflagged === o.skipped) {
+				new Notice(
+					`${head}: nothing to sync - none of the ${o.unflagged} notes in scope has a 'pds' or 'pds_publish' property set to true.`,
+				);
+				return;
+			}
 			new Notice(`${head}: up to date (${o.skipped} unchanged).`);
 		} else {
 			new Notice(`${head}: ${tail}, ${o.skipped} unchanged.`);
@@ -639,6 +673,7 @@ function emptyOutcome(): SyncOutcome {
 		deleted: 0,
 		conflicts: 0,
 		skipped: 0,
+		unflagged: 0,
 		failed: 0,
 		errors: [],
 	};
@@ -846,7 +881,7 @@ class PdsSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Sync behaviour")
 			.setDesc(
-				"Opt-in per note: checkbox property 'pds' -> private (encrypted), 'publish' -> public (standard.site).",
+				"Opt-in per note: checkbox property 'pds' -> private (encrypted), 'pds_publish' -> public (standard.site).",
 			)
 			.setHeading();
 
