@@ -39,8 +39,13 @@ export interface AuthResult {
 const DOH_URL = "https://cloudflare-dns.com/dns-query";
 
 /** Idempotent - safe to call repeatedly. */
-export function setupOAuth(clientId: string, redirectUri: string): void {
+export function setupOAuth(
+	clientId: string,
+	redirectUri: string,
+	storageName: string,
+): void {
 	configureOAuth({
+		storageName,
 		metadata: { client_id: clientId, redirect_uri: redirectUri },
 		identityResolver: new LocalActorResolver({
 			handleResolver: new CompositeHandleResolver({

@@ -71,6 +71,7 @@ export default class PdsSyncPlugin extends Plugin {
 			setupOAuth(
 				this.settings.oauthClientId,
 				this.settings.oauthRedirectUri,
+				this.storageName(),
 			);
 		}
 
@@ -170,6 +171,11 @@ export default class PdsSyncPlugin extends Plugin {
 		this.autoSyncDebounced?.cancel();
 	}
 
+	/** localStorage is shared by every plugin and, on mobile, by every vault. */
+	private storageName(): string {
+		return `${this.manifest.id}:${this.app.vault.getName()}`;
+	}
+
 	async loadSettings(): Promise<void> {
 		const data = (await this.loadData()) as Partial<PdsSyncSettings> | null;
 		this.settings = { ...DEFAULT_SETTINGS, ...(data ?? {}) };
@@ -255,6 +261,7 @@ export default class PdsSyncPlugin extends Plugin {
 			setupOAuth(
 				this.settings.oauthClientId,
 				this.settings.oauthRedirectUri,
+				this.storageName(),
 			);
 			if (this.settings.oauthDid) {
 				try {
@@ -324,6 +331,7 @@ export default class PdsSyncPlugin extends Plugin {
 				setupOAuth(
 					this.settings.oauthClientId,
 					this.settings.oauthRedirectUri,
+					this.storageName(),
 				);
 				const url = await startOAuthLogin(
 					this.settings.identifier,
@@ -368,6 +376,7 @@ export default class PdsSyncPlugin extends Plugin {
 			setupOAuth(
 				this.settings.oauthClientId,
 				this.settings.oauthRedirectUri,
+				this.storageName(),
 			);
 			const { rpc, did } = await finishOAuthLogin(search);
 			const previous = this.settings.oauthDid;
