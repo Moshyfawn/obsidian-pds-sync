@@ -1,3 +1,5 @@
+import type { PendingDeletion } from "./sync/deletions";
+
 /**
  * Persisted plugin configuration. Stored via Plugin.loadData/saveData in the
  * plugin's data.json - which holds credentials/session tokens, so it is
@@ -53,6 +55,9 @@ export interface PdsSyncSettings {
 	autoSyncOnChange: boolean;
 	/** Push the whole vault every N minutes (0 = off). */
 	autoSyncIntervalMinutes: number;
+
+	/** Record deletions awaiting a later sync's confirmation that the note is gone. */
+	pendingDeletions: PendingDeletion[];
 }
 
 /** Collection holding the publication record. */
@@ -86,6 +91,7 @@ export const DEFAULT_SETTINGS: PdsSyncSettings = {
 	syncFolder: "",
 	autoSyncOnChange: false,
 	autoSyncIntervalMinutes: 0,
+	pendingDeletions: [],
 };
 
 /** OAuth scope string. Must be a subset of the scope declared in client-metadata.json. */
