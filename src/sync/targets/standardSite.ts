@@ -1,7 +1,8 @@
 import type { AtpClient } from "../../atproto/client";
 import { markdownToPlain } from "../../util/markdown";
-import { casPush, rkeyFromUri } from "../push";
+import { casDelete, casPush, rkeyFromUri } from "../push";
 import type {
+	ListResult,
 	NoteInput,
 	PulledNote,
 	PushResult,
@@ -102,11 +103,11 @@ export class StandardSiteTarget implements SyncTarget {
 	}
 
 	async delete(client: AtpClient, ref: RemoteRef): Promise<void> {
-		await client.deleteRecord(this.collection, ref.rkey);
+		await casDelete(client, this.collection, ref);
 	}
 
-	async list(client: AtpClient): Promise<PulledNote[]> {
-		const out: PulledNote[] = [];
+	async list(client: AtpClient): Promise<ListResult> {
+		const listed: ListResult = { rkeys: new Set(), notes: [] };
 		let cursor: string | undefined;
 		do {
 			const page = await client.listRecords(this.collection, {
@@ -114,12 +115,13 @@ export class StandardSiteTarget implements SyncTarget {
 				cursor,
 			});
 			for (const rec of page.records) {
+				listed.rkeys.add(rkeyFromUri(rec.uri));
 				const note = this.decode(rec.uri, rec.cid, rec.value);
-				if (note) out.push(note);
+				if (note) listed.notes.push(note);
 			}
 			cursor = page.cursor;
 		} while (cursor);
-		return out;
+		return listed;
 	}
 }
 

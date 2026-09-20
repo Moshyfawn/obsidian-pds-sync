@@ -1,7 +1,7 @@
 import type { AtpClient } from "../../atproto/client";
 import type {
+	ListResult,
 	NoteInput,
-	PulledNote,
 	PushResult,
 	RemoteRef,
 	SyncTarget,
@@ -42,7 +42,7 @@ export class AtsSpaceTarget implements SyncTarget {
 		throw new Error(this.readyError());
 	}
 
-	async list(_client: AtpClient): Promise<PulledNote[]> {
-		return [];
+	async list(_client: AtpClient): Promise<ListResult> {
+		return { rkeys: new Set(), notes: [] };
 	}
 }
