@@ -58,6 +58,8 @@ export interface PdsSyncSettings {
 
 	/** Record deletions awaiting a later sync's confirmation that the note is gone. */
 	pendingDeletions: PendingDeletion[];
+	/** Whether `publish` has been rewritten to `pds_publish`. */
+	publishFlagMigrated: boolean;
 }
 
 /** Collection holding the publication record. */
@@ -92,6 +94,7 @@ export const DEFAULT_SETTINGS: PdsSyncSettings = {
 	autoSyncOnChange: false,
 	autoSyncIntervalMinutes: 0,
 	pendingDeletions: [],
+	publishFlagMigrated: false,
 };
 
 /** OAuth scope string. Must be a subset of the scope declared in client-metadata.json. */
