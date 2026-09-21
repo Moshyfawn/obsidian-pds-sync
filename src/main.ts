@@ -23,8 +23,10 @@ import {
 	startOAuthLogin,
 } from "./atproto/auth";
 import {
+	adoptVaultSecret,
 	keychainAvailable,
 	readSecret,
+	vaultSecretId,
 	writeSecret,
 	SECRET_APP_PASSWORD,
 	SECRET_E2EE_PASSPHRASE,
@@ -176,6 +178,14 @@ export default class PdsSyncPlugin extends Plugin {
 		return `${this.manifest.id}:${this.app.vault.getName()}`;
 	}
 
+	get passphraseId(): string {
+		return vaultSecretId(this.app, SECRET_E2EE_PASSPHRASE);
+	}
+
+	get appPasswordId(): string {
+		return vaultSecretId(this.app, SECRET_APP_PASSWORD);
+	}
+
 	async loadSettings(): Promise<void> {
 		const data = (await this.loadData()) as Partial<PdsSyncSettings> | null;
 		this.settings = { ...DEFAULT_SETTINGS, ...(data ?? {}) };
@@ -188,7 +198,7 @@ export default class PdsSyncPlugin extends Plugin {
 	async deriveE2eeKey(): Promise<void> {
 		const passphrase = readSecret(
 			this.app,
-			SECRET_E2EE_PASSPHRASE,
+			this.passphraseId,
 			this.settings.e2eePassphrase,
 		);
 		const did = this.client?.did;
@@ -205,11 +215,13 @@ export default class PdsSyncPlugin extends Plugin {
 	/** One-time move of any plaintext secrets in data.json into the keychain. */
 	private async migrateSecretsToKeychain(): Promise<void> {
 		if (!keychainAvailable(this.app)) return;
+		adoptVaultSecret(this.app, SECRET_APP_PASSWORD, this.appPasswordId);
+		adoptVaultSecret(this.app, SECRET_E2EE_PASSPHRASE, this.passphraseId);
 		let changed = false;
 		if (this.settings.appPassword) {
 			writeSecret(
 				this.app,
-				SECRET_APP_PASSWORD,
+				this.appPasswordId,
 				this.settings.appPassword,
 			);
 			this.settings.appPassword = "";
@@ -218,7 +230,7 @@ export default class PdsSyncPlugin extends Plugin {
 		if (this.settings.e2eePassphrase) {
 			writeSecret(
 				this.app,
-				SECRET_E2EE_PASSPHRASE,
+				this.passphraseId,
 				this.settings.e2eePassphrase,
 			);
 			this.settings.e2eePassphrase = "";
@@ -286,7 +298,7 @@ export default class PdsSyncPlugin extends Plugin {
 		// App-password mode - re-login from the (keychain'd) password each launch.
 		const password = readSecret(
 			this.app,
-			SECRET_APP_PASSWORD,
+			this.appPasswordId,
 			this.settings.appPassword,
 		);
 		if (this.settings.identifier && password) {
@@ -303,7 +315,7 @@ export default class PdsSyncPlugin extends Plugin {
 		try {
 			const password = readSecret(
 				this.app,
-				SECRET_APP_PASSWORD,
+				this.appPasswordId,
 				this.settings.appPassword,
 			);
 			const { rpc, did, handle } = await loginPassword({
@@ -855,12 +867,12 @@ class PdsSyncSettingTab extends PluginSettingTab {
 				.addText((t) => {
 					t.inputEl.type = "password";
 					t.setValue(
-						readSecret(this.app, SECRET_APP_PASSWORD, s.appPassword),
+						readSecret(this.app, this.plugin.appPasswordId, s.appPassword),
 					).onChange(async (v) => {
 						const val = v.trim();
 						s.appPassword = writeSecret(
 							this.app,
-							SECRET_APP_PASSWORD,
+							this.plugin.appPasswordId,
 							val,
 						)
 							? ""
@@ -949,7 +961,7 @@ class PdsSyncSettingTab extends PluginSettingTab {
 				t.setValue(
 					readSecret(
 						this.app,
-						SECRET_E2EE_PASSPHRASE,
+						this.plugin.passphraseId,
 						s.e2eePassphrase,
 					),
 				);
@@ -963,9 +975,9 @@ class PdsSyncSettingTab extends PluginSettingTab {
 
 	private async commitPassphrase(value: string): Promise<void> {
 		const s = this.plugin.settings;
-		if (value === readSecret(this.app, SECRET_E2EE_PASSPHRASE, s.e2eePassphrase))
+		if (value === readSecret(this.app, this.plugin.passphraseId, s.e2eePassphrase))
 			return;
-		s.e2eePassphrase = writeSecret(this.app, SECRET_E2EE_PASSPHRASE, value)
+		s.e2eePassphrase = writeSecret(this.app, this.plugin.passphraseId, value)
 			? ""
 			: value;
 		await this.plugin.saveSettings();
