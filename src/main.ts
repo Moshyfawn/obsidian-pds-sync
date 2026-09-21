@@ -40,6 +40,7 @@ import {
 } from "./settings";
 import {
 	DeletionQueue,
+	pendingFromData,
 	type DeletionQueueHost,
 } from "./sync/deletions";
 import { SyncEngine, type SyncOutcome } from "./sync/engine";
@@ -83,9 +84,10 @@ export default class PdsSyncPlugin extends Plugin {
 			(params) => void this.handleOAuthCallback(params),
 		);
 
-		this.deletions = new DeletionQueue(this.deletionHost(), [
-			...this.settings.pendingDeletions,
-		]);
+		this.deletions = new DeletionQueue(
+			this.deletionHost(),
+			pendingFromData(this.settings.pendingDeletions),
+		);
 		this.registerEvent(
 			this.app.metadataCache.on("deleted", (file, prevCache) => {
 				void this.deletions.enqueue(
@@ -655,10 +657,16 @@ export default class PdsSyncPlugin extends Plugin {
 	}
 
 	private async flushDeletions(outcome: SyncOutcome): Promise<void> {
-		const flushed = await this.deletions.flush();
-		outcome.deleted += flushed.deleted;
-		outcome.failed += flushed.errors.length;
-		outcome.errors.push(...flushed.errors);
+		try {
+			const flushed = await this.deletions.flush();
+			outcome.deleted += flushed.deleted;
+			outcome.failed += flushed.errors.length;
+			outcome.errors.push(...flushed.errors);
+		} catch (err) {
+			// A broken queue must not take the rest of the sync down with it.
+			outcome.failed++;
+			outcome.errors.push(`pending deletions: ${msg(err)}`);
+		}
 	}
 
 	private notify(o: SyncOutcome, label?: string): void {

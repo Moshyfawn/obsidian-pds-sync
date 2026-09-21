@@ -11,6 +11,24 @@ export interface PendingDeletion {
 	index: SyncIndex;
 }
 
+/** `data.json` is hand-editable, so an entry that cannot address a record is dropped. */
+export function pendingFromData(value: unknown): PendingDeletion[] {
+	if (!Array.isArray(value)) return [];
+	return (value as unknown[]).filter((raw): raw is PendingDeletion => {
+		const p = raw as {
+			path?: unknown;
+			index?: { target?: unknown; ref?: { rkey?: unknown; cid?: unknown } };
+		} | null;
+		const ref = p?.index?.ref;
+		return (
+			typeof p?.path === "string" &&
+			typeof p.index?.target === "string" &&
+			typeof ref?.rkey === "string" &&
+			typeof ref.cid === "string"
+		);
+	});
+}
+
 export interface DeletionQueueHost {
 	exists(path: string): boolean;
 	/** True if any note still carries this rkey in its index. */
