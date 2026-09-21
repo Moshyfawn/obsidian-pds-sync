@@ -11,10 +11,13 @@ export async function migratePublishFlag(app: App): Promise<number> {
 	for (const file of app.vault.getMarkdownFiles()) {
 		const fm = app.metadataCache.getFileCache(file)?.frontmatter;
 		if (!fm || !flagged(fm["publish"]) || !readIndex(fm)) continue;
-		await app.fileManager.processFrontMatter(file, (f) => {
-			delete f["publish"];
-			f[FLAG_PUBLIC] = true;
-		});
+		await app.fileManager.processFrontMatter(
+			file,
+			(f: Record<string, unknown>) => {
+				delete f["publish"];
+				f[FLAG_PUBLIC] = true;
+			},
+		);
 		moved++;
 	}
 	return moved;
