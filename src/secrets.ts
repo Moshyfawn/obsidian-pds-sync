@@ -12,6 +12,23 @@ import type { App } from "obsidian";
 export const SECRET_APP_PASSWORD = "pds-sync-app-password";
 export const SECRET_E2EE_PASSPHRASE = "pds-sync-e2ee-passphrase";
 
+/** iOS shares secret values across every vault on the device, so the id carries the vault. */
+export function vaultSecretId(app: App, id: string): string {
+	return `${id}:${app.vault.getName()}`;
+}
+
+/**
+ * Copy a secret saved by 1.1.0 or earlier under the old shared id. The old copy
+ * is left in place because on iOS another vault may still be on that version and
+ * need to read it.
+ */
+export function adoptVaultSecret(app: App, legacyId: string, id: string): void {
+	const ss = storage(app);
+	if (!ss || ss.getSecret(id)) return;
+	const legacy = ss.getSecret(legacyId);
+	if (legacy) ss.setSecret(id, legacy);
+}
+
 function storage(app: App): App["secretStorage"] | undefined {
 	return (app as Partial<App>).secretStorage;
 }
